@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated, cast
 
 import sqlalchemy as sa
@@ -56,16 +57,20 @@ class R:
     def get(self):
         return self.value, self.value2, self.value3
 
-    @cbv.info(status=status.HTTP_201_CREATED)
-    def post(self):
-        record = self.db_dep.execute(sa.text(f"select '{RESULT}'")).one()
-        return record[0]
-
     def get__wtf____(self):
         pass
 
     @cbv.info(path="/lalala")
     def get_custom(self): ...
+
+    async def get_async_value(self):
+        await asyncio.sleep(0.001)
+        return 1
+
+    @cbv.info(status=status.HTTP_201_CREATED)
+    def post(self):
+        record = self.db_dep.execute(sa.text(f"select '{RESULT}'")).one()
+        return record[0]
 
 
 @cbv
@@ -85,7 +90,9 @@ client = TestClient(app)
 
 def test_cbv():
     assert client.get("/r").json() == [dep1_value, dep2_value, dep3_value]
-    assert client.get("/_wtf____").is_success
+    assert client.get("/r/_wtf//").is_success
+    assert client.get("/lalala").is_success
+    assert client.get("/r/async_value").json() == 1
 
     post_resp = client.post("/r")
     assert post_resp.status_code == status.HTTP_201_CREATED

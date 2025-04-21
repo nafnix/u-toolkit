@@ -306,6 +306,13 @@ class CBV:
 
         update_parameters(collect_cls_dependencies, *parameters)
 
+        def new_fn(method_name, kwargs):
+            instance = self._build_cls(cls)
+            dependencies = kwargs.pop(collect_cls_dependencies.__name__)
+            for dep_name, dep_value in dependencies.items():
+                setattr(instance, dep_name, dep_value)
+            return getattr(instance, method_name)
+
         def decorator(method: Callable):
             method_name = method.__name__
 
@@ -321,13 +328,18 @@ class CBV:
 
             update_parameters(sign_cls_fn, *(parameters[1:]))
 
+            if inspect.iscoroutinefunction(method):
+
+                @wraps(sign_cls_fn)
+                async def awrapper(*args, **kwargs):
+                    fn = new_fn(method_name, kwargs)
+                    return await fn(*args, **kwargs)
+
+                return awrapper
+
             @wraps(sign_cls_fn)
             def wrapper(*args, **kwargs):
-                instance = self._build_cls(cls)
-                dependencies = kwargs.pop(collect_cls_dependencies.__name__)
-                for dep_name, dep_value in dependencies.items():
-                    setattr(instance, dep_name, dep_value)
-                fn = getattr(instance, method_name)
+                fn = new_fn(method_name, kwargs)
                 return fn(*args, **kwargs)
 
             return wrapper
