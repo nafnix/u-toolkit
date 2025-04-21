@@ -57,9 +57,9 @@ def update_signature(
     return_annotation: type | None = None,
 ):
     signature = inspect.signature(fn)
-    if parameters:
+    if parameters is not None:
         signature = signature.replace(parameters=parameters)
-    if return_annotation:
+    if return_annotation is not None:
         signature = signature.replace(return_annotation=return_annotation)
 
     setattr(fn, "__signature__", signature)
