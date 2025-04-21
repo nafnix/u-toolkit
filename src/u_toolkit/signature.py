@@ -1,6 +1,5 @@
 import inspect
 from collections.abc import Callable, Sequence
-from functools import partial
 from typing import Annotated, Any, overload
 
 
