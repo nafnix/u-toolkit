@@ -1,10 +1,18 @@
 from collections.abc import Callable, Sequence
 from typing import Generic, Literal, Protocol, cast
 
-from fastapi import status
+from fastapi import Response, status
+from fastapi.responses import JSONResponse, ORJSONResponse
+from fastapi.utils import is_body_allowed_for_status_code
 from pydantic import BaseModel, create_model
 
 from u_toolkit.pydantic.type_vars import BaseModelT
+
+
+try:
+    import orjson
+except ImportError:  # pragma: nocover
+    orjson = None  # type: ignore
 
 
 class WrapperError(BaseModel, Generic[BaseModelT]):  # type: ignore
@@ -113,3 +121,23 @@ class NamedHTTPError(Exception, Generic[BaseModelT]):
     @classmethod
     def response_schema(cls):
         return {cls.status: {"model": cls.response_class()}}
+
+
+def named_http_error_handler(_, exc: NamedHTTPError):
+    headers = exc.headers
+
+    if not is_body_allowed_for_status_code(exc.status):
+        return Response(status_code=exc.status, headers=headers)
+
+    if orjson:
+        return ORJSONResponse(
+            exc.data.model_dump(exclude_none=True),
+            status_code=exc.status,
+            headers=headers,
+        )
+
+    return JSONResponse(
+        exc.data.model_dump(exclude_none=True),
+        status_code=exc.status,
+        headers=headers,
+    )
