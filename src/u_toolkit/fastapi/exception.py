@@ -83,13 +83,13 @@ class NamedHTTPError(Exception, Generic[BaseModelT]):
     def __init__(
         self,
         *,
-        message: str,
+        message: str | None = None,
         target: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
         kwargs = {
             "code": self.error_code(),
-            "message": message,
+            "message": message or "operation failed",
         }
 
         if target:
