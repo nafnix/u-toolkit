@@ -13,7 +13,11 @@ from u_toolkit.fastapi.helpers import get_depend_from_annotation, is_depend
 from u_toolkit.fastapi.responses import Response, build_responses
 from u_toolkit.helpers import is_annotated
 from u_toolkit.merge import deep_merge_dict
-from u_toolkit.signature import update_parameters, with_parameter
+from u_toolkit.signature import (
+    list_parameters,
+    update_parameters,
+    with_parameter,
+)
 
 
 class EndpointsClassInterface(Protocol):
@@ -304,7 +308,9 @@ class CBV:
             for name, dep in iter_dependencies(cls)
         ]
 
-        update_parameters(collect_cls_dependencies, *parameters)
+        has_cls_deps = bool(parameters)
+        if has_cls_deps:
+            update_parameters(collect_cls_dependencies, *parameters)
 
         def new_fn(method_name, kwargs):
             instance = self._build_cls(cls)
@@ -320,11 +326,14 @@ class CBV:
             sign_cls_fn = partial(cls_fn)
             update_wrapper(sign_cls_fn, cls_fn)
 
-            parameters, *_ = with_parameter(
-                sign_cls_fn,
-                name=collect_cls_dependencies.__name__,
-                default=Depends(collect_cls_dependencies),
-            )
+            if has_cls_deps:
+                parameters, *_ = with_parameter(
+                    sign_cls_fn,
+                    name=collect_cls_dependencies.__name__,
+                    default=Depends(collect_cls_dependencies),
+                )
+            else:
+                parameters = list_parameters(sign_cls_fn)
 
             update_parameters(sign_cls_fn, *(parameters[1:]))
 
