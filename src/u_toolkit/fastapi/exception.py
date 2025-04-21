@@ -1,5 +1,6 @@
+import inspect
 from collections.abc import Callable, Sequence
-from typing import Generic, Literal, Protocol, cast
+from typing import Any, Generic, Literal, TypeVar, cast
 
 from fastapi import Response, status
 from fastapi.responses import JSONResponse, ORJSONResponse
@@ -10,12 +11,12 @@ from u_toolkit.pydantic.type_vars import BaseModelT
 
 
 try:
-    import orjson
+    import orjson  # type: ignore
 except ImportError:  # pragma: nocover
     orjson = None  # type: ignore
 
 
-class WrapperError(BaseModel, Generic[BaseModelT]):  # type: ignore
+class WrapperError(BaseModel, Generic[BaseModelT]):
     @classmethod
     def create(
         cls: type["WrapperError[BaseModelT]"],
@@ -24,7 +25,10 @@ class WrapperError(BaseModel, Generic[BaseModelT]):  # type: ignore
         raise NotImplementedError
 
 
-class EndpointError(WrapperError, Generic[BaseModelT]):
+WrapperErrorT = TypeVar("WrapperErrorT", bound=WrapperError)
+
+
+class EndpointError(WrapperError[BaseModelT], Generic[BaseModelT]):
     error: BaseModelT
 
     @classmethod
@@ -32,20 +36,17 @@ class EndpointError(WrapperError, Generic[BaseModelT]):
         return cls(error=model)
 
 
-class HTTPErrorInterface(Protocol):
-    status: int
-
-    @classmethod
-    def response_class(cls) -> type[BaseModel]: ...
-
-
-class NamedHTTPError(Exception, Generic[BaseModelT]):
+class NamedHTTPError(Exception, Generic[WrapperErrorT, BaseModelT]):
     status: int = status.HTTP_400_BAD_REQUEST
     code: str | None = None
-    targets: Sequence[str] | None = None
-    target_transform: Callable[[str], str] | None = None
+    targets: Sequence[Any] | None = None
+    target_transform: Callable[[Any], Any] | None = None
     message: str | None = None
-    wrapper_class: type[WrapperError[BaseModelT]] | None = EndpointError
+    wrapper: (
+        type[WrapperError[BaseModelT]]
+        | tuple[WrapperErrorT, Callable[[BaseModelT], WrapperErrorT]]
+        | None
+    ) = None
 
     @classmethod
     def error_name(cls):
@@ -87,7 +88,7 @@ class NamedHTTPError(Exception, Generic[BaseModelT]):
         target: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "code": self.error_code(),
             "message": message or "operation failed",
         }
@@ -99,10 +100,13 @@ class NamedHTTPError(Exception, Generic[BaseModelT]):
             kwargs["message"] = kwargs["message"].format(target=target)
 
         self.model = self.model_class()(**kwargs)
+        create: Callable[[BaseModelT], BaseModel] | None = None
+        if inspect.isclass(self.wrapper):
+            create = self.wrapper.create
+        elif isinstance(self.wrapper, tuple):
+            create = self.wrapper[1]
         self.data: BaseModel = (
-            self.wrapper_class.create(self.model)
-            if self.wrapper_class is not None
-            else self.model
+            create(self.model) if create is not None else self.model
         )
 
         self.headers = headers
@@ -116,7 +120,16 @@ class NamedHTTPError(Exception, Generic[BaseModelT]):
     @classmethod
     def response_class(cls):
         model = cls.model_class()
-        return cls.wrapper_class if cls.wrapper_class is not None else model
+
+        if cls.wrapper:
+            wrapper: Any
+            if inspect.isclass(cls.wrapper):
+                wrapper = cls.wrapper
+            else:
+                wrapper = cls.wrapper[0]
+            return wrapper[model]
+
+        return model
 
     @classmethod
     def response_schema(cls):
