@@ -24,7 +24,8 @@ class EndpointsClassInterface(Protocol):
     deprecated: bool | None = None
 
     @classmethod
-    def build_self(cls) -> Self: ...
+    def build_self(cls) -> Self:
+        return cls()
 
 
 _T = TypeVar("_T")
