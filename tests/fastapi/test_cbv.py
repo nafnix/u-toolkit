@@ -61,6 +61,12 @@ class R:
         record = self.db_dep.execute(sa.text(f"select '{RESULT}'")).one()
         return record[0]
 
+    def get__wtf____(self):
+        pass
+
+    @cbv.info(path="/lalala")
+    def get_custom(self): ...
+
 
 @cbv
 class _NoPath:
@@ -79,6 +85,7 @@ client = TestClient(app)
 
 def test_cbv():
     assert client.get("/r").json() == [dep1_value, dep2_value, dep3_value]
+    assert client.get("/_wtf____").is_success
 
     post_resp = client.post("/r")
     assert post_resp.status_code == status.HTTP_201_CREATED

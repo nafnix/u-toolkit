@@ -68,7 +68,8 @@ class Methods(StrEnum):
 
 
 METHOD_PATTERNS = {
-    method: re.compile(f"^{method}", re.IGNORECASE) for method in Methods
+    method: re.compile(f"^({method}_|{method})", re.IGNORECASE)
+    for method in Methods
 }
 
 _FnName = str
@@ -107,7 +108,7 @@ def iter_endpoints(cls: type[_T]):
         paths = [prefix]
 
         if method := get_method(name):
-            path = method[1].sub(name, "").replace("__", "/")
+            path = method[1].sub("", name).replace("__", "/")
             if path:
                 paths.append(path)
 
@@ -136,6 +137,7 @@ def iter_dependencies(cls: type[_T]):
 
 
 _CBVEndpointParamName = Literal[
+    "path",
     "tags",
     "dependencies",
     "responses",
@@ -197,6 +199,8 @@ class CBV:
             method
         ]
 
+        path = self._state[cls][method_name].get("path") or path
+
         return self.router.api_route(
             path,
             methods=endpoint_methods,
@@ -211,6 +215,7 @@ class CBV:
     def info(
         self,
         *,
+        path: str | None = None,
         methods: list[Methods | LiteralUpperMethods | LiteralLowerMethods]
         | None = None,
         tags: list[str | Enum] | None = None,
@@ -223,6 +228,7 @@ class CBV:
         state = self._state
         initial_state = self._initial_state
         data: dict[_CBVEndpointParamName, Any] = {
+            "path": path,
             "methods": methods,
             "tags": tags,
             "dependencies": dependencies,
