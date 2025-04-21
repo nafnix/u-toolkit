@@ -296,26 +296,31 @@ class CBV:
             )
             for name, dep in iter_dependencies(cls)
         ]
+
         update_parameters(collect_cls_dependencies, *parameters)
 
         def decorator(method: Callable):
-            sign_fn = partial(method)
-            update_wrapper(sign_fn, method)
+            method_name = method.__name__
+
+            cls_fn = getattr(cls, method_name)
+            sign_cls_fn = partial(cls_fn)
+            update_wrapper(sign_cls_fn, cls_fn)
 
             parameters, *_ = with_parameter(
-                method,
+                sign_cls_fn,
                 name=collect_cls_dependencies.__name__,
                 default=Depends(collect_cls_dependencies),
             )
-            update_parameters(sign_fn, *parameters)
 
-            @wraps(sign_fn)
+            update_parameters(sign_cls_fn, *(parameters[1:]))
+
+            @wraps(sign_cls_fn)
             def wrapper(*args, **kwargs):
                 instance = self._build_cls(cls)
                 dependencies = kwargs.pop(collect_cls_dependencies.__name__)
                 for dep_name, dep_value in dependencies.items():
                     setattr(instance, dep_name, dep_value)
-                fn = getattr(instance, method.__name__)
+                fn = getattr(instance, method_name)
                 return fn(*args, **kwargs)
 
             return wrapper

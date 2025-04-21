@@ -57,13 +57,12 @@ def update_signature(
     return_annotation: type | None = None,
 ):
     signature = inspect.signature(fn)
-    kwargs = {}
     if parameters:
-        kwargs["parameters"] = parameters
+        signature = signature.replace(parameters=parameters)
     if return_annotation:
-        kwargs["return_annotation"] = return_annotation
+        signature = signature.replace(return_annotation=return_annotation)
 
-    fn.__signature__ = signature.replace(**kwargs)  # type: ignore
+    setattr(fn, "__signature__", signature)
 
 
 def update_parameters(fn: Callable, *parameters: inspect.Parameter):

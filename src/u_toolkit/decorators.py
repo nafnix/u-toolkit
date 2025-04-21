@@ -27,7 +27,8 @@ class DefineMethodDecorator(Generic[_T, _FnT]):
         self.register_method(DefineMethodParams(owner_class, name, self.fn))
 
     def __get__(self, instance: _T, owner_class: type[_T]):
-        update_parameters(self.fn, *list_parameters(self.fn)[1:])
+        parameters = list_parameters(self.fn)[1:]
+        update_parameters(self.fn, *parameters)
 
         @wraps(self.fn)
         def wrapper(*args, **kwargs):
