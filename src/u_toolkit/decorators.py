@@ -1,8 +1,7 @@
+import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import Generic, NamedTuple, TypeVar
-
-from u_toolkit.signature import list_parameters, update_parameters
 
 
 _FnT = TypeVar("_FnT", bound=Callable)
@@ -27,8 +26,13 @@ class DefineMethodDecorator(Generic[_T, _FnT]):
         self.register_method(DefineMethodParams(owner_class, name, self.fn))
 
     def __get__(self, instance: _T, owner_class: type[_T]):
-        parameters = list_parameters(self.fn)[1:]
-        update_parameters(self.fn, *parameters)
+        if inspect.iscoroutinefunction(self.fn):
+
+            @wraps(self.fn)
+            async def awrapper(*args, **kwargs):
+                return await self.fn(instance, *args, **kwargs)
+
+            return awrapper
 
         @wraps(self.fn)
         def wrapper(*args, **kwargs):

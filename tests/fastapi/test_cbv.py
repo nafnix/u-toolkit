@@ -84,6 +84,7 @@ class _NoPath:
 
     @cbv.info(methods=["DELETE"])
     async def post_wtf(self):
+        await asyncio.sleep(1)
         return 1
 
 
@@ -107,8 +108,9 @@ def test_cbv():
     value = "example"
     assert (
         client.post(
-            "/",
+            "/alala",
             data={"username": value, "password": value},
         ).json()
         == value
     )
+    assert client.delete("/post_wtf").json() == 1
