@@ -53,19 +53,25 @@ def define_method_handler(
 
 _P = ParamSpec("_P")
 
+_T2 = TypeVar("_T2")
+
 
 def create_decorator(
-    handle: Callable[_P] | None = None,
+    handle: Callable[_P, _T2] | None = None,
+    use_handle_return: bool | None = None,
 ):
     def decorator(fn: Callable[_P, _T]):
         if inspect.iscoroutinefunction(fn):
 
             @wraps(fn)
             async def async_wrapper(*args, **kwargs):
+                handle_result = None
                 if inspect.iscoroutinefunction(handle):
-                    await handle(*args, **kwargs)
+                    handle_result = await handle(*args, **kwargs)
                 elif handle:
-                    handle(*args, **kwargs)
+                    handle_result = handle(*args, **kwargs)
+                if use_handle_return:
+                    return handle_result
                 return await fn(*args, **kwargs)
 
             return async_wrapper
@@ -73,7 +79,10 @@ def create_decorator(
         @wraps(fn)
         def wrapper(*args: _P.args, **kwargs: _P.kwargs):
             if handle:
-                handle(*args, **kwargs)
+                handle_result = handle(*args, **kwargs)
+                if use_handle_return:
+                    return handle_result
+
             return fn(*args, **kwargs)
 
         return wrapper
