@@ -97,7 +97,7 @@ class NamedHTTPError(Exception, Generic[WrapperErrorT, BaseModelT]):
     ) -> None:
         kwargs: dict[str, Any] = {
             "code": self.error_code(),
-            "message": message or "operation failed",
+            "message": message or self.message or "operation failed",
         }
 
         if target:
