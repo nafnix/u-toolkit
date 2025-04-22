@@ -163,6 +163,9 @@ class CBVRoutesInfo(TypedDict):
     deprecated: NotRequired[bool | None]
 
 
+CBVRoutesInfoT = TypeVar("CBVRoutesInfoT", bound=CBVRoutesInfo)
+
+
 class CBVRouteInfo(CBVRoutesInfo, Generic[_T]):
     methods: NotRequired[list[RequestMethod] | None]
     response_model: NotRequired[type[_T] | None]
@@ -172,15 +175,19 @@ class CBVRouteInfo(CBVRoutesInfo, Generic[_T]):
     name: NotRequired[str | None]
 
 
-class CBV:
+class CBV(Generic[CBVRoutesInfoT]):
     def __init__(self, router: APIRouter | None = None) -> None:
         self.router = router or APIRouter()
 
-        self._state: dict[type, dict[_FnName, CBVRouteInfo]] = {}
-        self._cls_routes_extra: dict[
-            type, tuple[CBVRoutesInfo, Callable[[type[_T]], _T] | None]  # type: ignore
+        self.state: dict[type, dict[_FnName, CBVRouteInfo]] = {}
+        self.routes_extra: dict[
+            type,
+            tuple[
+                CBVRoutesInfoT | None,
+                Callable[[type[_T]], _T] | None,  # type: ignore
+            ],
         ] = {}
-        self._initialed_state: dict[type[_T], _T] = {}  # type: ignore
+        self.initialed_state: dict[type[_T], _T] = {}  # type: ignore
 
     def create_route(
         self,
@@ -190,44 +197,44 @@ class CBV:
         method: RequestMethod,
         method_name: str,
     ):
-        class_routes_info = self._cls_routes_extra[cls][0]
+        class_routes_info = self.routes_extra[cls][0] or {}
 
         class_tags = class_routes_info.get("tags") or []
         endpoint_tags: list[str | Enum] = (
-            self._state[cls][method_name].get("tags") or []
+            self.state[cls][method_name].get("tags") or []
         )
         tags = class_tags + endpoint_tags
 
         class_dependencies = class_routes_info.get("dependencies") or []
         endpoint_dependencies = (
-            self._state[cls][method_name].get("dependencies") or []
+            self.state[cls][method_name].get("dependencies") or []
         )
         dependencies = class_dependencies + endpoint_dependencies
 
         class_responses = class_routes_info.get("responses") or []
         endpoint_responses = (
-            self._state[cls][method_name].get("responses") or []
+            self.state[cls][method_name].get("responses") or []
         )
         responses = build_responses(*class_responses, *endpoint_responses)
 
-        status_code = self._state[cls][method_name].get("status")
+        status_code = self.state[cls][method_name].get("status")
 
-        deprecated = self._state[cls][method_name].get(
+        deprecated = self.state[cls][method_name].get(
             "deprecated", class_routes_info.get("deprecated")
         )
 
-        response_model = self._state[cls][method_name].get("response_model")
+        response_model = self.state[cls][method_name].get("response_model")
 
         endpoint_methods = [
             i.upper()
-            for i in (self._state[cls][method_name].get("methods") or [method])
+            for i in (self.state[cls][method_name].get("methods") or [method])
         ]
 
-        path = self._state[cls][method_name].get("path") or path
+        path = self.state[cls][method_name].get("path") or path
 
-        summary = self._state[cls][method_name].get("summary")
-        description = self._state[cls][method_name].get("description")
-        name = self._state[cls][method_name].get("name")
+        summary = self.state[cls][method_name].get("summary")
+        description = self.state[cls][method_name].get("description")
+        name = self.state[cls][method_name].get("name")
         return self.router.api_route(
             path,
             methods=endpoint_methods,
@@ -257,7 +264,7 @@ class CBV:
         status: int | None = None,
         deprecated: bool | None = None,
     ):
-        state = self._state
+        state = self.state
         initial_state = self._initial_state
         data = CBVRouteInfo(
             path=path,
@@ -283,22 +290,20 @@ class CBV:
         return define_method_handler(handle)
 
     def _initial_state(self, cls: type[_T]) -> _T:
-        if result := self._initialed_state.get(cls):
+        if result := self.initialed_state.get(cls):
             return cast(_T, result)
 
         default_data = {}
         for endpoint in iter_endpoints(cls):
             default_data[endpoint.original_handle_name] = {}
 
-        self._state.setdefault(cls, default_data)
+        self.state.setdefault(cls, default_data)
         result = self._build_cls(cls)
-        self._initialed_state[cls] = result
+        self.initialed_state[cls] = result
         return result
 
     def _build_cls(self, cls: type[_T]) -> _T:
-        if cls in self._cls_routes_extra and (
-            build := self._cls_routes_extra[cls][1]
-        ):
+        if cls in self.routes_extra and (build := self.routes_extra[cls][1]):
             return build(cls)  # type: ignore
         return cls()
 
@@ -381,24 +386,24 @@ class CBV:
     def __call__(
         self,
         *,
-        info: CBVRoutesInfo | None = None,
+        info: CBVRoutesInfoT | None = None,
         build: Callable[[type[_T]], _T] | None = None,
     ) -> Callable[[type[_T]], type[_T]]: ...
 
     def __call__(self, *args, **kwargs):
-        info: CBVRoutesInfo = {}
+        info = None
         build: Callable | None = None
 
         def decorator(cls: type[_T]) -> type[_T]:
             instance = self._initial_state(cls)
-            self._cls_routes_extra[cls] = info, build
+            self.routes_extra[cls] = info, build
 
             decorator = self.__create_class_dependencies_injector(cls)
 
             def valid_method(
                 name: str, _handle: Callable
             ) -> None | list[_MethodInfo]:
-                if (cls_state := self._state.get(cls)) and (
+                if (cls_state := self.state.get(cls)) and (
                     method_state := cls_state.get(name)
                 ):
                     methods: list[RequestMethod] = (
@@ -429,7 +434,7 @@ class CBV:
         if args:
             return decorator(args[0])
 
-        info.update(kwargs.get("info") or {})
+        info = kwargs.get("info") or None
         build = kwargs.get("build")
 
         return decorator
