@@ -39,7 +39,7 @@ EndpointsClassInterfaceT = TypeVar(
 )
 
 
-LiteralUpperMethods = Literal[
+LiteralUpperMethod = Literal[
     "GET",
     "POST",
     "PATCH",
@@ -49,7 +49,7 @@ LiteralUpperMethods = Literal[
     "HEAD",
     "TRACE",
 ]
-LiteralLowerMethods = Literal[
+LiteralLowerMethod = Literal[
     "get",
     "post",
     "patch",
@@ -72,23 +72,31 @@ class Methods(StrEnum):
     TRACE = auto()
 
 
+RequestMethod = Methods | LiteralLowerMethod | LiteralUpperMethod
+
+
 METHOD_PATTERNS = {
     method: re.compile(f"^({method}_|{method})", re.IGNORECASE)
     for method in Methods
 }
 
+
 _FnName = str
 
 
 class EndpointInfo(NamedTuple):
-    fn: Callable
-    original_name: str
-    method: Methods
+    handle: Callable
+    original_handle_name: str
+    handle_name: str
+    method: RequestMethod
     method_pattern: re.Pattern
     path: str
 
 
-def get_method(name: str):
+_MethodInfo = tuple[RequestMethod, re.Pattern[str]]
+
+
+def get_method(name: str) -> _MethodInfo | None:
     for method, method_pattern in METHOD_PATTERNS.items():
         if method_pattern.search(name):
             return method, method_pattern
@@ -100,29 +108,41 @@ def valid_endpoint(name: str):
         raise ValueError("Invalid endpoint function.")
 
 
-def iter_endpoints(cls: type[_T]):
-    prefix = "/"
+def iter_endpoints(
+    cls: type[_T],
+    valid_method: Callable[[str, Callable], list[_MethodInfo] | None]
+    | None = None,
+):
+    prefix = ""
 
     if not cls.__name__.startswith("_"):
-        prefix += f"{to_snake(cls.__name__)}"
+        prefix += f"/{to_snake(cls.__name__)}"
 
-    for name, fn in inspect.getmembers(
+    for name, handle in inspect.getmembers(
         cls,
         lambda arg: inspect.ismethoddescriptor(arg) or inspect.isfunction(arg),
     ):
         paths = [prefix]
 
+        methods: list[_MethodInfo] = []
         if method := get_method(name):
-            path = method[1].sub("", name).replace("__", "/")
+            methods.append(method)
+        elif valid_method:
+            methods.extend(valid_method(name, handle) or [])
+
+        for method, pattern in methods:
+            handle_name = pattern.sub("", name)
+            path = handle_name.replace("__", "/")
             if path:
                 paths.append(path)
 
             yield EndpointInfo(
-                fn=fn,
-                original_name=name,
+                handle=handle,
+                original_handle_name=name,
+                handle_name=handle_name,
                 path="/".join(paths),
-                method=method[0],
-                method_pattern=method[1],
+                method=method,
+                method_pattern=pattern,
             )
 
 
@@ -171,7 +191,7 @@ class CBV:
         *,
         cls: type[EndpointsClassInterfaceT],
         path: str,
-        method: Methods | LiteralUpperMethods | LiteralLowerMethods,
+        method: RequestMethod,
         method_name: str,
     ):
         class_tags = list(cls.tags) if cls.tags else []
@@ -221,8 +241,7 @@ class CBV:
         self,
         *,
         path: str | None = None,
-        methods: list[Methods | LiteralUpperMethods | LiteralLowerMethods]
-        | None = None,
+        methods: list[RequestMethod] | None = None,
         tags: list[str | Enum] | None = None,
         dependencies: list | None = None,
         responses: list[Response] | None = None,
@@ -261,7 +280,7 @@ class CBV:
 
         default_data = {}
         for endpoint in iter_endpoints(n_cls):
-            default_data[endpoint.original_name] = {}
+            default_data[endpoint.original_handle_name] = {}
 
         self._state.setdefault(n_cls, default_data)
         result = self._build_cls(n_cls)
@@ -361,14 +380,31 @@ class CBV:
 
         decorator = self.__create_class_dependencies_injector(cls_)
 
-        for endpoint_info in iter_endpoints(cls):
+        def valid_method(
+            name: str, _handle: Callable
+        ) -> None | list[_MethodInfo]:
+            if (cls_state := self._state.get(cls_)) and (
+                method_state := cls_state.get(name)
+            ):
+                methods: list[RequestMethod] = (
+                    method_state.get("methods") or []
+                )
+                result: list[_MethodInfo] = []
+                for i in methods:
+                    method = Methods(i.lower())
+                    result.append((method, METHOD_PATTERNS[method]))
+                return result
+
+            return None
+
+        for endpoint_info in iter_endpoints(cls, valid_method):
             route = self.create_route(
                 cls=cast(type[EndpointsClassInterface], cls),
                 path=endpoint_info.path,
                 method=endpoint_info.method,
-                method_name=endpoint_info.original_name,
+                method_name=endpoint_info.original_handle_name,
             )
-            method = getattr(instance, endpoint_info.original_name)
+            method = getattr(instance, endpoint_info.original_handle_name)
             endpoint = decorator(method)
             route(endpoint)
 
