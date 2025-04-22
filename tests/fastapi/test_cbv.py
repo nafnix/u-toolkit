@@ -77,8 +77,14 @@ class R:
 class _NoPath:
     value = Depends(dep1)
 
-    def post(self, data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    def post_alala(
+        self, data: Annotated[OAuth2PasswordRequestForm, Depends()]
+    ):
         return data.username
+
+    @cbv.info(methods=["DELETE"])
+    async def wtf(self):
+        return 1
 
 
 app = FastAPI()
