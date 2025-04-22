@@ -1,7 +1,7 @@
 import inspect
 from collections.abc import Callable
 from functools import wraps
-from typing import Generic, NamedTuple, TypeVar
+from typing import Generic, NamedTuple, ParamSpec, TypeVar
 
 
 _FnT = TypeVar("_FnT", bound=Callable)
@@ -49,3 +49,33 @@ def define_method_handler(
             handle(params)
 
     return Decorator
+
+
+_P = ParamSpec("_P")
+
+
+def create_decorator(
+    handle: Callable[_P] | None = None,
+):
+    def decorator(fn: Callable[_P, _T]):
+        if inspect.iscoroutinefunction(fn):
+
+            @wraps(fn)
+            async def async_wrapper(*args, **kwargs):
+                if inspect.iscoroutinefunction(handle):
+                    await handle(*args, **kwargs)
+                elif handle:
+                    handle(*args, **kwargs)
+                return await fn(*args, **kwargs)
+
+            return async_wrapper
+
+        @wraps(fn)
+        def wrapper(*args: _P.args, **kwargs: _P.kwargs):
+            if handle:
+                handle(*args, **kwargs)
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
