@@ -125,13 +125,15 @@ def iter_endpoints(
         paths = [prefix]
 
         methods: list[_MethodInfo] = []
+        from_valid_method = False
         if method := get_method(name):
             methods.append(method)
         elif valid_method:
             methods.extend(valid_method(name, handle) or [])
+            from_valid_method = True
 
         for method, pattern in methods:
-            handle_name = pattern.sub("", name)
+            handle_name = name if from_valid_method else pattern.sub("", name)
             path = handle_name.replace("__", "/")
             if path:
                 paths.append(path)
@@ -406,6 +408,7 @@ class CBV:
             )
             method = getattr(instance, endpoint_info.original_handle_name)
             endpoint = decorator(method)
+            endpoint.__name__ = endpoint_info.handle_name
             route(endpoint)
 
         return cls

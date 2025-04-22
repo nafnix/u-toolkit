@@ -83,7 +83,7 @@ class _NoPath:
         return data.username
 
     @cbv.info(methods=["DELETE"])
-    async def wtf(self):
+    async def post_wtf(self):
         return 1
 
 
