@@ -13,7 +13,7 @@ def _merge_responses(
         model_class = response.get("model")
         if status in source:
             source_model_class = source[status].get("model")
-            if source_model_class is not None:
+            if source_model_class and model_class:
                 target[status]["model"] = model_class | source_model_class
 
     for status, response in source.items():
@@ -59,6 +59,7 @@ def build_responses(*responses: Response):
             status = arg
         else:
             errors.append(arg)
+            continue
 
         result[status] = {"model": response}
 
