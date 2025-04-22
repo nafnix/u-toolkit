@@ -1,6 +1,6 @@
 import inspect
 from collections.abc import Callable, Sequence
-from typing import Any, Generic, Literal, TypeVar, cast
+from typing import Any, Generic, Literal, Protocol, TypeVar, cast
 
 from fastapi import Response, status
 from fastapi.responses import JSONResponse, ORJSONResponse
@@ -34,6 +34,13 @@ class EndpointError(WrapperError[BaseModelT], Generic[BaseModelT]):
     @classmethod
     def create(cls, model: BaseModelT):
         return cls(error=model)
+
+
+class HTTPErrorInterface(Protocol):
+    status: int
+
+    @classmethod
+    def response_class(cls) -> type[BaseModel]: ...
 
 
 class NamedHTTPError(Exception, Generic[WrapperErrorT, BaseModelT]):
