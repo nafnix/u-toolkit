@@ -167,6 +167,9 @@ class CBVRouteInfo(CBVRoutesInfo, Generic[_T]):
     methods: NotRequired[list[RequestMethod] | None]
     response_model: NotRequired[type[_T] | None]
     status: NotRequired[int | None]
+    summary: NotRequired[str | None]
+    description: NotRequired[str | None]
+    name: NotRequired[str | None]
 
 
 class CBV:
@@ -222,6 +225,9 @@ class CBV:
 
         path = self._state[cls][method_name].get("path") or path
 
+        summary = self._state[cls][method_name].get("summary")
+        description = self._state[cls][method_name].get("description")
+        name = self._state[cls][method_name].get("name")
         return self.router.api_route(
             path,
             methods=endpoint_methods,
@@ -231,9 +237,12 @@ class CBV:
             responses=responses,
             status_code=status_code,
             deprecated=deprecated,
+            summary=summary,
+            description=description,
+            name=name,
         )
 
-    def info(
+    def info(  # noqa: PLR0913
         self,
         *,
         path: str | None = None,
@@ -242,6 +251,9 @@ class CBV:
         dependencies: list | None = None,
         responses: list[Response] | None = None,
         response_model: type[_T] | None = None,
+        summary: str | None = None,
+        description: str | None = None,
+        name: str | None = None,
         status: int | None = None,
         deprecated: bool | None = None,
     ):
@@ -256,6 +268,9 @@ class CBV:
             response_model=response_model,
             status=status,
             deprecated=deprecated,
+            summary=summary,
+            description=description,
+            name=name,
         )
 
         def handle(params: DefineMethodParams):
