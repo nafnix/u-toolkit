@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 
-def get_name(fn: Callable, /):
+def get_name(fn: Callable, /) -> str:
     return fn.__name__
 
 
