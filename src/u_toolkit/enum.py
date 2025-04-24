@@ -1,6 +1,6 @@
 from enum import StrEnum, auto
 
-from .alias_generators import to_camel, to_pascal, to_snake
+from .naming import to_camel, to_pascal, to_snake
 
 
 __all__ = [

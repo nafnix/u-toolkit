@@ -21,7 +21,7 @@ from u_toolkit.decorators import DefineMethodParams, define_method_handler
 from u_toolkit.fastapi.helpers import get_depend_from_annotation, is_depend
 from u_toolkit.fastapi.responses import Response, build_responses
 from u_toolkit.helpers import is_annotated
-from u_toolkit.merge import deep_merge_dict
+from u_toolkit.merge import merge
 from u_toolkit.signature import (
     list_parameters,
     update_parameters,
@@ -282,7 +282,7 @@ class CBV(Generic[CBVRoutesInfoT]):
 
         def handle(params: DefineMethodParams):
             initial_state(params.method_class)
-            deep_merge_dict(
+            merge(
                 state,
                 {params.method_class: {params.method_name: data}},
             )
@@ -307,7 +307,7 @@ class CBV(Generic[CBVRoutesInfoT]):
             return build(cls)  # type: ignore
         return cls()
 
-    def __create_class_dependencies_injector(self, cls: type[_T]):
+    def __create_class_dependencies_injector(self, cls: type[_T]):  # noqa: C901
         """将类的依赖添加到函数实例上
 
         ```python
@@ -335,7 +335,7 @@ class CBV(Generic[CBVRoutesInfoT]):
 
         has_cls_deps = bool(parameters)
         if has_cls_deps:
-            update_parameters(collect_cls_dependencies, *parameters)
+            update_parameters(collect_cls_dependencies, parameters=parameters)
 
         def new_fn(method_name, kwargs):
             instance = self._build_cls(cls)
@@ -344,12 +344,9 @@ class CBV(Generic[CBVRoutesInfoT]):
                 setattr(instance, dep_name, dep_value)
             return getattr(instance, method_name)
 
-        def decorator(method: Callable):
-            method_name = method.__name__
-
+        def create_endpoint_signature_decorator(method_name):
             cls_fn = getattr(cls, method_name)
-            sign_cls_fn = partial(cls_fn)
-            update_wrapper(sign_cls_fn, cls_fn)
+            sign_cls_fn = update_wrapper(partial(cls_fn), cls_fn)
 
             if has_cls_deps:
                 parameters, *_ = with_parameter(
@@ -360,23 +357,35 @@ class CBV(Generic[CBVRoutesInfoT]):
             else:
                 parameters = list_parameters(sign_cls_fn)
 
-            update_parameters(sign_cls_fn, *(parameters[1:]))
+            update_parameters(sign_cls_fn, parameters=parameters[1:])
 
+            return wraps(sign_cls_fn)
+
+        def decorator(method: Callable):
+            method_name = method.__name__
+
+            def create_endpoint_function(kwargs):
+                return new_fn(method_name, kwargs)
+
+            sign = create_endpoint_signature_decorator(method_name)
+
+            function = None
             if inspect.iscoroutinefunction(method):
 
-                @wraps(sign_cls_fn)
                 async def awrapper(*args, **kwargs):
-                    fn = new_fn(method_name, kwargs)
+                    fn = create_endpoint_function(kwargs)
                     return await fn(*args, **kwargs)
 
-                return awrapper
+                function = awrapper
+            else:
 
-            @wraps(sign_cls_fn)
-            def wrapper(*args, **kwargs):
-                fn = new_fn(method_name, kwargs)
-                return fn(*args, **kwargs)
+                def wrapper(*args, **kwargs):
+                    fn = create_endpoint_function(kwargs)
+                    return fn(*args, **kwargs)
 
-            return wrapper
+                function = wrapper
+
+            return sign(function)
 
         return decorator
 

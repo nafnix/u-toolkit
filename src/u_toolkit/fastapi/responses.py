@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from u_toolkit.merge import deep_merge_dict
+from u_toolkit.merge import _merge_dict
 
 from .exception import HTTPErrorInterface
 
@@ -31,7 +31,7 @@ def error_responses(*errors: type[HTTPErrorInterface]):
 
             source[e.status] = {"model": current | model_class}
         else:
-            deep_merge_dict(source, {e.status: {"model": model_class}})
+            _merge_dict(source, {e.status: {"model": model_class}})
     return source
 
 

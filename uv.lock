@@ -505,10 +505,10 @@ wheels = [
 
 [[package]]
 name = "u-toolkit"
-version = "0.1.12"
+version = "0.1.19"
 source = { editable = "." }
 dependencies = [
-    { name = "pydantic" },
+    { name = "sqlalchemy" },
 ]
 
 [package.optional-dependencies]
@@ -534,9 +534,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.115.12" },
-    { name = "pydantic", specifier = ">=2.11.3" },
     { name = "pydantic-settings", marker = "extra == 'fastapi'", specifier = ">=2.9.1" },
-    { name = "sqlalchemy", marker = "extra == 'sqlalchemy'", specifier = ">=2.0.40" },
+    { name = "sqlalchemy", specifier = ">=2" },
+    { name = "sqlalchemy", marker = "extra == 'sqlalchemy'", specifier = ">=2" },
 ]
 provides-extras = ["sqlalchemy", "fastapi"]
 

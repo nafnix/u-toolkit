@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, WrapSerializer
 
-from u_toolkit.alias_generators import to_camel
+from u_toolkit.naming import to_camel
 from u_toolkit.datetime import to_utc
 
 from .type_vars import BaseModelT
