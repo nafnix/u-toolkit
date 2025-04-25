@@ -75,7 +75,7 @@ def add_parameter(
     )
 
     new_fn = update_wrapper(partial(fn), fn)
-    update_parameters(fn, *p.parameters)
+    update_parameters(fn, parameters=p.parameters)
     return new_fn
 
 
