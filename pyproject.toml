@@ -1,24 +1,14 @@
 [project]
 name = "u-toolkit"
-version = "0.1.19"
+version = "0.1.20"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "sqlalchemy>=2",
 ]
 
 [project.scripts]
 u-toolkit = "u_toolkit:main"
-
-[project.optional-dependencies]
-sqlalchemy = [
-    "sqlalchemy>=2",
-]
-fastapi = [
-    "fastapi>=0.115.12",
-    "pydantic-settings>=2.9.1",
-]
 
 [build-system]
 requires = ["hatchling"]
@@ -27,12 +17,9 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "devtools>=0.12.2",
-    "httpx>=0.28.1",
     "pytest>=8.3.5",
-    "python-multipart>=0.0.20",
     "rich>=14.0.0",
     "ruff>=0.11.6",
-    "uvicorn>=0.34.2",
 ]
 
 
